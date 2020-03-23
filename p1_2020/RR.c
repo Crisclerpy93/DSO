@@ -25,6 +25,9 @@ static TCB t_state[N];
 static TCB* running;
 static int current = 0;
 
+/*Old running thread*/
+static TCB* prev;
+
 /* Variable indicating if the library is initialized (init == 1) or not (init == 0) */
 static int init=0;
 
@@ -36,7 +39,7 @@ static void idle_function()
   while(1);
 }
 
-void function_thread(int sec)
+void function_thread1(int sec)
 {
     //time_t end = time(NULL) + sec;
     while(running->remaining_ticks)
@@ -120,7 +123,7 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
     perror("*** ERROR: getcontext in my_thread_create");
     exit(-1);
   }
-
+  t_state[i].ticks = QUANTUM_TICKS;
   t_state[i].state = INIT;
   t_state[i].priority = priority;
   t_state[i].function = fun_addr;
@@ -210,6 +213,7 @@ int mythread_gettid(){
 
 TCB* scheduler()
 {
+  printf("SOY SCHEDULER!!!");
   if(queue_empty(ready) == 1){
     printf("*** FINISHED\n");
     exit(1);
@@ -232,27 +236,41 @@ TCB* scheduler()
 
 /* Timer interrupt */
 void timer_interrupt(int sig)
-{
+{ 
+  printf("SOY TIMER_INTERRUPT!!");
   running->ticks = running->ticks -1;
-  if(running->ticks >=0){
+/*  if(running->ticks >=0){
     running->ticks = QUANTUM_TICKS;
     disable_interrupt();
-    if(queue_empty(q_l) == 0){
+    if(queue_empty(ready) == 0){
       running->statw  = READY;
-      enqueue(q_listos, running);
+      enqueue(ready, running);
       TCB *next = scheduler();
       activator(next);
     }
     enable_interrupt();
-  }
+  }*/
+  if (running->ticks == 0){
+    printf("SOY TIMER_INTERRUPT!!");
+    running->state == INIT;
+    running->ticks == QUANTUM_TICKS;
+    enqueue(ready, running);
+    prev = running;
+    running = scheduler();
+    int tid = running->tid;
+    t_state[tid].state = RUNNING;
+    //running->state == RUNNING;
+    activator(running->run_env);
+  } 
 } 
 
 /* Activator */
 void activator(TCB* next)
 {
-  TCB *prev = running;
-  running = next;
-  running->state = RUNNING;
+  //TCB *prev = running;
+  //running = next;
+  //running->state = RUNNING;
+  printf("SOY ACTIVATOR!!");
   if(prev->state == FREE){
     printf("*** THREAD %d TERMINATED: SETCONTEXT OF %d\n", prev->tid, next->tid);
     setcontext(&(next->run_env));
