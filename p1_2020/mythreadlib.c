@@ -16,6 +16,7 @@ void activator();
 void timer_interrupt(int sig);
 void disk_interrupt(int sig);
 
+struct queue *ready;
 
 /* Array of state thread control blocks: the process allows a maximum of N threads */
 static TCB t_state[N]; 
@@ -23,6 +24,9 @@ static TCB t_state[N];
 /* Current running thread */
 static TCB* running;
 static int current = 0;
+
+/*Old running thread*/
+static TCB* prev;
 
 /* Variable indicating if the library is initialized (init == 1) or not (init == 0) */
 static int init=0;
@@ -93,6 +97,9 @@ void init_mythreadlib()
   t_state[0].tid = 0;
   running = &t_state[0];
 
+  /*Initialize ready threads queue*/
+  ready = queue_new();
+
   /* Initialize disk and clock interrupts */
   init_disk_interrupt();
   init_interrupt();
@@ -116,7 +123,7 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
     perror("*** ERROR: getcontext in my_thread_create");
     exit(-1);
   }
-
+  t_state[i].ticks = QUANTUM_TICKS;
   t_state[i].state = INIT;
   t_state[i].priority = priority;
   t_state[i].function = fun_addr;
@@ -206,7 +213,14 @@ int mythread_gettid(){
 
 TCB* scheduler()
 {
-  int i;
+  printf("SOY SCHEDULER!!!");
+  if(queue_empty(ready) == 1){
+    printf("*** FINISHED\n");
+    exit(1);
+  }else{
+    return dequeue(ready);
+  }
+  /*int i;
   for(i=0; i<N; i++)
   {
     if (t_state[i].state == INIT) 
@@ -216,22 +230,56 @@ TCB* scheduler()
     }
   }
   printf("mythread_free: No thread in the system\nExiting...\n");	
-  exit(1);
+  exit(1);*/
 }
 
 
 /* Timer interrupt */
 void timer_interrupt(int sig)
-{
-  
-
+{ 
+  printf("SOY TIMER_INTERRUPT1!!\n");
+  running->ticks = running->ticks -1;
+  printf("%d\n", running->ticks);
+/*  if(running->ticks >=0){
+    running->ticks = QUANTUM_TICKS;
+    disable_interrupt();
+    if(queue_empty(ready) == 0){
+      running->statw  = READY;
+      enqueue(ready, running);
+      TCB *next = scheduler();
+      activator(next);
+    }
+    enable_interrupt();
+  }*/
+  if (running->ticks == 0){
+    printf("SOY TIMER_INTERRUP2T!!\n");
+    running->state = INIT;
+    running->ticks = QUANTUM_TICKS;
+    printf("QUANTUM: %d\n", running->ticks);
+    enqueue(ready, running);
+    prev = running;
+    running = scheduler();
+    //int tid = running->tid;
+    //t_state[tid].state = RUNNING;
+    //running->state = RUNNING;
+    activator(running->run_env);
+  } 
 } 
 
 /* Activator */
 void activator(TCB* next)
 {
-  setcontext (&(next->run_env));
-  printf("mythread_free: After setcontext, should never get here!!...\n");	
+  TCB *prev = running;
+  running = next;
+  //running->state = RUNNING;
+  printf("SOY ACTIVATOR!!");
+  if(prev->state == FREE){
+    printf("*** THREAD %d TERMINATED: SETCONTEXT OF %d\n", prev->tid, next->tid);
+    setcontext(&(next->run_env));
+  }else{
+    printf("*** SWAPCONTEXT FROM %d TO %d\n", prev->tid, next->tid);
+    swapcontext(&(prev->run_env), &(running->run_env));
+  }
 }
 
 

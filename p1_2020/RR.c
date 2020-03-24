@@ -218,7 +218,7 @@ TCB* scheduler()
     printf("*** FINISHED\n");
     exit(1);
   }else{
-    return dequeque(ready);
+    return dequeue(ready);
   }
   /*int i;
   for(i=0; i<N; i++)
@@ -237,8 +237,9 @@ TCB* scheduler()
 /* Timer interrupt */
 void timer_interrupt(int sig)
 { 
-  printf("SOY TIMER_INTERRUPT!!");
+  printf("SOY TIMER_INTERRUPT1!!\n");
   running->ticks = running->ticks -1;
+  printf("%d\n", running->ticks);
 /*  if(running->ticks >=0){
     running->ticks = QUANTUM_TICKS;
     disable_interrupt();
@@ -251,14 +252,15 @@ void timer_interrupt(int sig)
     enable_interrupt();
   }*/
   if (running->ticks == 0){
-    printf("SOY TIMER_INTERRUPT!!");
+    printf("SOY TIMER_INTERRUP2T!!\n");
     running->state == INIT;
     running->ticks == QUANTUM_TICKS;
+    printf("QUANTUM: %d\n", running->ticks);
     enqueue(ready, running);
     prev = running;
     running = scheduler();
-    int tid = running->tid;
-    t_state[tid].state = RUNNING;
+    //int tid = running->tid;
+    //t_state[tid].state = RUNNING;
     //running->state == RUNNING;
     activator(running->run_env);
   } 
