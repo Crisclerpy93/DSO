@@ -46,7 +46,7 @@ void init_interrupt()
   void timer_interrupt(int sig);
   struct sigaction sigdat;
   /* Initializes the signal mask to empty */
-  sigemptyset(&maskval_interrupt); 
+  sigemptyset(&maskval_interrupt);
   /* Prepare a virtual time alarm */
   sigdat.sa_handler = my_handler;
   sigemptyset(&sigdat.sa_mask);
@@ -98,19 +98,19 @@ void init_disk_interrupt()
   struct sigevent event;
   timer_t timer_id;
   struct timespec periodTime;
-  struct itimerspec timerdata; 
+  struct itimerspec timerdata;
   struct sigaction sigdat;
  /* Create timer */
  event.sigev_notify = SIGEV_SIGNAL;
  event.sigev_signo = SIGPROF;
  timer_create (CLOCK_REALTIME, &event, &timer_id);
-  
+
  // set periodTime time
  periodTime.tv_sec=1;
  periodTime.tv_nsec=0;
 
  /* Initializes the signal mask to empty */
- sigemptyset(&maskval_net_interrupt); 
+ sigemptyset(&maskval_net_interrupt);
  /* Prepare a virtual time alarm */
 
  sigdat.sa_handler = my_disk_handler;

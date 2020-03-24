@@ -8,7 +8,6 @@
 
 //#include "mythread.h"
 #include "interrupt.h"
-
 #include "queue.h"
 
 TCB* scheduler();
@@ -26,7 +25,7 @@ static TCB* running;
 static int current = 0;
 
 /*Old running thread*/
-static TCB* prev;
+//static TCB* prev;
 
 /* Variable indicating if the library is initialized (init == 1) or not (init == 0) */
 static int init=0;
@@ -166,13 +165,14 @@ void disk_interrupt(int sig)
 
 /* Free terminated thread and exits */
 void mythread_exit() {
+  printf("SOY EXIT!!");
   int tid = mythread_gettid();
-
   printf("*** THREAD %d FINISHED\n", tid);
   t_state[tid].state = FREE;
   free(t_state[tid].run_env.uc_stack.ss_sp);
   disable_interrupt();
   TCB* next = scheduler();
+  //current = current+1;
   enable_interrupt();
   activator(next);
 }
@@ -219,7 +219,6 @@ int mythread_gettid(){
 
 TCB* scheduler()
 {
-  printf("SOY SCHEDULER!!!");
   if(queue_empty(ready) == 1){
     printf("*** FINISHED\n");
     exit(1);
@@ -239,39 +238,27 @@ TCB* scheduler()
   exit(1);
 }
 
-
+/*TCB* running*/
 /* Timer interrupt */
 void timer_interrupt(int sig)
 {
   running->ticks = running->ticks -1;
-/*  if(running->ticks >=0){
+  if (running->ticks == 0){
+    //printf("SOY TIMER_INTERRUP2T!!\n");
+    //running->state = INIT;
     running->ticks = QUANTUM_TICKS;
+    printf("%d",running->remaining_ticks);
+    //printf("QUANTUM: %d\n", running->ticks);
     disable_interrupt();
-    if(queue_empty(ready) == 0){
-      running->statw  = READY;
+    if (queue_empty(ready)==0){
+      running->state = INIT;
       enqueue(ready, running);
+      //prev = running;
+      //running = scheduler();
+      //activator(running);
       TCB *next = scheduler();
       activator(next);
     }
-    enable_interrupt();
-  }*/
-  if (running->ticks == 0){
-    printf("SOY TIMER_INTERRUP2T!!\n");
-    running->state = INIT;
-    running->ticks = QUANTUM_TICKS;
-    printf("QUANTUM: %d\n", running->ticks);
-    disable_interrupt();
-    if (queue_empty(ready)==0){
-      //running->state = READY;
-      enqueue(ready, running);
-      prev = running;
-      running = scheduler();
-      //activator(running->run_env);
-      activator(running);
-    }
-    //int tid = running->tid;
-    //t_state[tid].state = RUNNING;
-    //running->state = RUNNING;
     enable_interrupt();
   }
 }
@@ -281,7 +268,8 @@ void activator(TCB* next)
 {
   TCB *prev = running;
   running = next;
-  printf("SOY ACTIVATOR!!");
+  printf("ACTUAL:%d\n", current);
+  //printf("SOY ACTIVATOR!!");
   if(prev->state == FREE){
     printf("*** THREAD %d TERMINATED: SETCONTEXT OF %d\n", prev->tid, next->tid);
     setcontext(&(next->run_env));
