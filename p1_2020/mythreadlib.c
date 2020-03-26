@@ -15,6 +15,7 @@ void activator();
 void timer_interrupt(int sig);
 void disk_interrupt(int sig);
 
+/*Queue containing ready threads to be executed*/
 struct queue *ready;
 
 /* Array of state thread control blocks: the process allows a maximum of N threads */
@@ -139,7 +140,6 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
   t_state[i].run_env.uc_stack.ss_flags = 0;
   makecontext(&t_state[i].run_env, fun_addr,2,seconds);
 
-  t_state[i].state = WAITING;
   disable_interrupt();
   enqueue(ready, &t_state[i]);
   enable_interrupt();
@@ -164,10 +164,9 @@ void disk_interrupt(int sig)
 
 /* Free terminated thread and exits */
 void mythread_exit() {
-  int tid = mythread_gettid();
-  //printf("TID:%d\n", tid);
+  //int tid = mythread_gettid();
+  int tid = running->tid;
   printf("*** THREAD %d FINISHED\n", tid);
-  //t_state[tid].state = FREE;
   running->state = FREE;
   free(t_state[tid].run_env.uc_stack.ss_sp);
   disable_interrupt();
@@ -234,11 +233,11 @@ TCB* scheduler()
 void timer_interrupt(int sig)
 {
   running->ticks = running->ticks -1;
+  running->remaining_ticks = running->remaining_ticks -1;
   if (running->ticks == 0){
     running->ticks = QUANTUM_TICKS;
     disable_interrupt();
     if (queue_empty(ready)==0){
-      running->state = INIT;
       enqueue(ready, running);
       TCB *next = scheduler();
       activator(next);
