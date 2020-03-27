@@ -156,17 +156,15 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
     if(running->priority == LOW_PRIORITY){
       running->ticks = QUANTUM_TICKS;
       enqueue(ready_low, running);
-      //sorted_enqueue(ready_high, &t_state[i], 1);
-      enqueue(ready_high, &t_state[i]);
-      //sort_queue_by_execution_time(ready_high);
+      sorted_enqueue(ready_high, &t_state[i], t_state[i].remaining_ticks);
+      //enqueue(ready_high, &t_state[i]);
       queue_print(ready_high);
       TCB *next = scheduler();
       activator(next);
     //if runing is high, sort them by execution time and run SJF
     }else{
-      enqueue(ready_high, &t_state[i]);
-      //sort_queue_by_execution_time(ready_high);
-      //sorted_enqueue(ready_high, &t_state[i], 1);
+      //enqueue(ready_high, &t_state[i]);
+      sorted_enqueue(ready_high, &t_state[i], t_state[i].remaining_ticks);
       queue_print(ready_high);
       //TCB *next = scheduler();
       //activator(next);

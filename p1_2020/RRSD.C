@@ -206,7 +206,7 @@ void disk_interrupt(int sig)
   if(queue_empty(waiting)==0){
     TCB *ready_thread= dequeue(waiting);
     printf("*** THREAD %d READY\n", ready_thread->tid);
-    if(ready_thread->priority == HIGH_PRIORITY){
+    if(ready_thread == HIGH_PRIORITY){
       enqueue(ready_high, ready_thread);
       if (running->priority == LOW_PRIORITY){
         running->ticks =  QUANTUM_TICKS;
@@ -315,7 +315,7 @@ void timer_interrupt(int sig)
   if(running->tid == -1){
     disable_interrupt();
     if(queue_empty(ready_high)==0 || queue_empty(ready_low)==0){
-      TCB *next = scheduler();
+      TCB *next = scheduler;
       activator(next);
     }
     enable_interrupt();
