@@ -187,7 +187,7 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
 
 /* Read disk syscall */
 int read_disk()
-{
+{ //
   if(data_in_page_cache() != 0){
       disable_interrupt();
       running->state =  WAITING;
@@ -201,7 +201,7 @@ int read_disk()
 
 /* Disk interrupt  */
 void disk_interrupt(int sig)
-{
+{// si esta idle y lista está vacia, pero hay listo para ejecutar ejecuto else. si scheudler devuelve  idle he acabado, 
   disable_interrupt();
   if(queue_empty(waiting)==0){
     TCB *ready_thread= dequeue(waiting);

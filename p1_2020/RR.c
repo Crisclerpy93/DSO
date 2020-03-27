@@ -169,22 +169,19 @@ void mythread_exit() {
   printf("*** THREAD %d FINISHED\n", tid);
   running->state = FREE;
   free(t_state[tid].run_env.uc_stack.ss_sp);
-  disable_interrupt();
   TCB* next = scheduler();
-  enable_interrupt();
   activator(next);
 }
 
 
 void mythread_timeout(int tid) {
-
-    printf("*** THREAD %d EJECTED\n", tid);
-    t_state[tid].state = FREE;
-    free(t_state[tid].run_env.uc_stack.ss_sp);
-    disable_interrupt();
-    TCB* next = scheduler();
-    enable_interrupt();
-    activator(next);
+  //int tid = running->tid;
+  //printf("%dREMAINING:\n", running->remaining_ticks);
+  printf("*** THREAD %d EJECTED\n", tid);
+  t_state[tid].state = FREE;
+  free(t_state[tid].run_env.uc_stack.ss_sp);
+  TCB* next = scheduler();
+  activator(next);
 }
 
 
@@ -220,29 +217,32 @@ TCB* scheduler()
   if(queue_empty(ready) == 1){
     printf("*** FINISHED\n");
     exit(1);
-  }else{
-    return dequeue(ready);
-
   }
-  printf("mythread_free: No thread in the system\nExiting...\n");
-  exit(1);
+  disable_interrupt();
+  TCB *next = dequeue(ready);
+  enable_interrupt();
+  return next;
 }
 
 /*TCB* running*/
 /* Timer interrupt */
 void timer_interrupt(int sig)
 {
-  running->ticks = running->ticks -1;
   running->remaining_ticks = running->remaining_ticks -1;
+  //printf("%dREMAINING:\n", running->remaining_ticks);
+  if(running->remaining_ticks<0){ //FALTA EN RR
+    mythread_timeout(running->tid);
+    return;
+  }
+  running->ticks = running->ticks -1;
   if (running->ticks == 0){
     running->ticks = QUANTUM_TICKS;
+    running->state = INIT;
     disable_interrupt();
-    if (queue_empty(ready)==0){
-      enqueue(ready, running);
-      TCB *next = scheduler();
-      activator(next);
-    }
+    enqueue(ready, running);
     enable_interrupt();
+    TCB *next = scheduler();
+    activator(next);
   }
 }
 
@@ -251,14 +251,15 @@ void activator(TCB* next)
 {
   TCB *prev = running;
   running = next;
+  if(running==prev){
+    return;
+  }
   if(prev->state == FREE){
     printf("*** THREAD %d TERMINATED: SETCONTEXT OF %d\n", prev->tid, next->tid);
     setcontext(&(next->run_env));
     printf("mythread_free: After setcontext, should never get here!!...\n");
   }else{
-    if(prev->tid!=next->tid){
       printf("*** SWAPCONTEXT FROM %d TO %d\n", prev->tid, next->tid);
       swapcontext(&(prev->run_env), &(running->run_env));
-    }
   }
 }

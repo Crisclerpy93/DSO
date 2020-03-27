@@ -219,8 +219,7 @@ void mythread_exit() {
 void mythread_timeout(int tid) {
     //int tid = running->tid;
     printf("*** THREAD %d EJECTED\n", tid);
-    //running->state = FREE;
-    t_state[tid].state = FREE;
+    running->state = FREE;
     free(t_state[tid].run_env.uc_stack.ss_sp);
     TCB* next = scheduler();
     activator(next);
@@ -255,19 +254,17 @@ int mythread_gettid(){
 /* SJF para alta prioridad, RR para baja*/
 TCB* scheduler()
 {
-  TCB *next;
+  /*if(queue_empty(ready) == 1){
+    printf("*** FINISHED\n");
+    exit(1);
+  }else{
+    return dequeue(ready);
+
+  }*/
   if(queue_empty(ready_high)==0){
-    //return dequeue(ready_high);
-    disable_interrupt();
-    next = dequeue(ready_high);
-    enable_interrupt();
-    return next;
+    return dequeue(ready_high);
   }else if(queue_empty(ready_low)==0){
-    //return dequeue(ready_low);
-    disable_interrupt();
-    next = dequeue(ready_low);
-    enable_interrupt();
-    return next;
+    return dequeue(ready_low);
   }else{
     //printf("mythread_free: No thread in the system\nExiting...\n");
     printf("*** FINISHED\n");
@@ -280,7 +277,7 @@ TCB* scheduler()
 void timer_interrupt(int sig)
 {
   running->remaining_ticks = running->remaining_ticks -1;
-  if(running->remaining_ticks<0){ //FALTA EN RR
+  if(running->remaining_ticks<0){
     mythread_timeout(running->tid);
     return;
   }
@@ -312,15 +309,15 @@ void activator(TCB* next)
   if(prev->state == FREE){
     printf("*** THREAD %d TERMINATED: SETCONTEXT OF %d\n", prev->tid, next->tid);
     setcontext(&(next->run_env));
-    printf("mythread_free: After setcontext, should never get here!!...\n");
+    //printf("mythread_free: After setcontext, should never get here!!...\n");
   }else{
-    if(prev->priority == LOW_PRIORITY && running->priority == HIGH_PRIORITY){
-      printf("*** THREAD %d PREEMPTED: SETCONTEXT OF %d\n", prev->tid, running->tid);
-      printf("*** SWAPCONTEXT FROM %d TO %d\n", prev->tid, next->tid);
-      swapcontext(&(prev->run_env), &(running->run_env));
-    }else{
-      printf("*** SWAPCONTEXT FROM %d TO %d\n", prev->tid, next->tid);
-      swapcontext(&(prev->run_env), &(running->run_env));
-    }
+      if(prev->priority == LOW_PRIORITY && running->priority == HIGH_PRIORITY){
+        printf("*** THREAD %d PREEMPTED: SETCONTEXT OF %d\n", prev->tid, running->tid);
+        printf("*** SWAPCONTEXT FROM %d TO %d\n", prev->tid, next->tid);
+        swapcontext(&(prev->run_env), &(running->run_env));
+      }else{
+        printf("*** SWAPCONTEXT FROM %d TO %d\n", prev->tid, next->tid);
+        swapcontext(&(prev->run_env), &(running->run_env));
+      }
   }
 }
