@@ -15,7 +15,7 @@ void activator();
 void timer_interrupt(int sig);
 void disk_interrupt(int sig);
 
-/*Queue containing ready threads to be executed*/
+/*Queue containing ready threads to be executed. One for LOW_PRIORITY and one for HIGH_PRIORITY*/
 struct queue *ready_low;
 struct queue *ready_high;
 
@@ -96,7 +96,7 @@ void init_mythreadlib()
   t_state[0].tid = 0;
   running = &t_state[0];
 
-  /*Initialize ready threads queue*/
+  /*Initialize ready threads queues*/
   ready_low = queue_new();
   ready_high = queue_new();
 
@@ -123,6 +123,12 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
     perror("*** ERROR: getcontext in my_thread_create");
     exit(-1);
   }
+
+  /*if (priority != LOW_PRIORITY && priority != HIGH_PRIORITY){
+    perror("*** ERROR: invalid priority in my_thread_create");
+    exit(-1);
+  }*/
+
   t_state[i].ticks = QUANTUM_TICKS;
   t_state[i].state = INIT;
   t_state[i].priority = priority;
@@ -143,16 +149,17 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
   makecontext(&t_state[i].run_env, fun_addr,2,seconds);
 
   disable_interrupt();
-
+  //enqueue(ready, &t_state[i]); --> RR
   //if ready thread is high priority check if running is high or low
   if(t_state[i].priority == HIGH_PRIORITY){
-    //if running is low, preempt it and reset ticks. Execute high one
+    //if running is low, preempt it and reset ticks. Run high one
     if(running->priority == LOW_PRIORITY){
       running->ticks = QUANTUM_TICKS;
       enqueue(ready_low, running);
       //sorted_enqueue(ready_high, &t_state[i], 1);
       enqueue(ready_high, &t_state[i]);
       //sort_queue_by_execution_time(ready_high);
+      queue_print(ready_high);
       TCB *next = scheduler();
       activator(next);
     //if runing is high, sort them by execution time and run SJF
@@ -160,14 +167,16 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
       enqueue(ready_high, &t_state[i]);
       //sort_queue_by_execution_time(ready_high);
       //sorted_enqueue(ready_high, &t_state[i], 1);
-      TCB *next = scheduler();
-      activator(next);
+      queue_print(ready_high);
+      //TCB *next = scheduler();
+      //activator(next);
     }
   //if ready thread is low priority enqueue it
   }else{
     enqueue(ready_low, &t_state[i]);
   }
   enable_interrupt();
+
   return i;
 }
 /****** End my_thread_create() ******/
@@ -195,8 +204,8 @@ void mythread_exit() {
   free(t_state[tid].run_env.uc_stack.ss_sp);
   disable_interrupt();
   TCB* next = scheduler();
-  enable_interrupt();
   activator(next);
+  enable_interrupt();
 }
 
 
@@ -238,9 +247,15 @@ int mythread_gettid(){
 
 
 /* SJF para alta prioridad, RR para baja*/
-
 TCB* scheduler()
 {
+  /*if(queue_empty(ready) == 1){
+    printf("*** FINISHED\n");
+    exit(1);
+  }else{
+    return dequeue(ready);
+
+  }*/
   if(queue_empty(ready_high)==0){
     return dequeue(ready_high);
   }else if(queue_empty(ready_low)==0){
@@ -256,6 +271,18 @@ TCB* scheduler()
 /* Timer interrupt */
 void timer_interrupt(int sig)
 {
+  /*running->ticks = running->ticks -1;
+  running->remaining_ticks = running->remaining_ticks -1;
+  if (running->ticks == 0){
+    running->ticks = QUANTUM_TICKS;
+    disable_interrupt();
+    if (queue_empty(ready)==0){
+      enqueue(ready, running);
+      TCB *next = scheduler();
+      activator(next);
+    }
+    enable_interrupt();
+  }*/
   if (running->priority == LOW_PRIORITY){
     running->ticks = running->ticks -1;
     running->remaining_ticks = running->remaining_ticks -1;
@@ -287,6 +314,7 @@ void activator(TCB* next)
         printf("*** THREAD %d PREEMPTED: SETCONTEXT OF %d\n", prev->tid, running->tid);
         printf("*** SWAPCONTEXT FROM %d TO %d\n", prev->tid, next->tid);
         swapcontext(&(prev->run_env), &(running->run_env));
+        printf("ESTOY AQUI");
       }else{
         printf("*** SWAPCONTEXT FROM %d TO %d\n", prev->tid, next->tid);
         swapcontext(&(prev->run_env), &(running->run_env));
