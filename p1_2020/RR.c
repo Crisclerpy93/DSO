@@ -173,10 +173,8 @@ void mythread_exit() {
   activator(next);
 }
 
-
+/* Free running thread due to exceeded time*/
 void mythread_timeout(int tid) {
-  //int tid = running->tid;
-  //printf("%dREMAINING:\n", running->remaining_ticks);
   printf("*** THREAD %d EJECTED\n", tid);
   t_state[tid].state = FREE;
   free(t_state[tid].run_env.uc_stack.ss_sp);
@@ -210,14 +208,15 @@ int mythread_gettid(){
 }
 
 
-/* SJF para alta prioridad, RR para baja*/
-
+/* SJF for high priority, RR for low*/
 TCB* scheduler()
 {
+  //If queue is empty, finish execution
   if(queue_empty(ready) == 1){
     printf("*** FINISHED\n");
     exit(1);
   }
+  //If not, get next thread
   disable_interrupt();
   TCB *next = dequeue(ready);
   enable_interrupt();
@@ -228,12 +227,16 @@ TCB* scheduler()
 /* Timer interrupt */
 void timer_interrupt(int sig)
 {
+
+  //Updating remaining_ticks
   running->remaining_ticks = running->remaining_ticks -1;
-  //printf("%dREMAINING:\n", running->remaining_ticks);
-  if(running->remaining_ticks<0){ //FALTA EN RR
+  //Following code, if timeout has to be used in RR (LOW_PRIORITY)
+  /*if(running->remaining_ticks<0){
     mythread_timeout(running->tid);
     return;
-  }
+  }*/
+
+  //After updating running ticks, if time slice is exceeded, get next thread to be executed
   running->ticks = running->ticks -1;
   if (running->ticks == 0){
     running->ticks = QUANTUM_TICKS;
@@ -251,6 +254,7 @@ void activator(TCB* next)
 {
   TCB *prev = running;
   running = next;
+  //If current and next threads are the same, return. (No swapcontext required)
   if(running==prev){
     return;
   }

@@ -15,7 +15,7 @@ void activator();
 void timer_interrupt(int sig);
 void disk_interrupt(int sig);
 
-/*Queue containing ready threads to be executed. One for LOW_PRIORITY and one for HIGH_PRIORITY*/
+/*Queues containing ready threads to be executed. One for LOW_PRIORITY, one for HIGH_PRIORITY*/
 struct queue *ready_low;
 struct queue *ready_high;
 
@@ -148,11 +148,8 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
   t_state[i].run_env.uc_stack.ss_flags = 0;
   makecontext(&t_state[i].run_env, fun_addr,2,seconds);
 
-  //disable_interrupt();
-  //enqueue(ready, &t_state[i]); --> RR
-  //if ready thread is high priority check if running is high or low
-  //if ready thread is low priority enqueue it
 
+  //if ready thread is low priority enqueue it
   if(t_state[i].priority == LOW_PRIORITY){
     disable_interrupt();
     enqueue(ready_low, &t_state[i]);
@@ -160,23 +157,23 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
     return i;
   }
 
+  //if ready thread is high priority check if running is high or low
   if(t_state[i].priority == HIGH_PRIORITY){
-    //if running is low, preempt it and reset ticks. Run high one
+    //if running is low, preempt it and reset ticks. Run shortest high one
     if(running->priority == LOW_PRIORITY){
       running->ticks = QUANTUM_TICKS;
+      running->ticks = INIT;
       disable_interrupt();
       enqueue(ready_low, running);
       sorted_enqueue(ready_high, &t_state[i], t_state[i].remaining_ticks);
       enable_interrupt();
-      //enqueue(ready_high, &t_state[i]);
-      //queue_print(ready_high);
       TCB *next = scheduler();
       activator(next);
       return i;
-    //if runing is high, sort them by execution time and run SJF
   }
-  if(runing->remaining_ticks > t_state[i].remaining_ticks){
-      //enqueue(ready_high, &t_state[i]);
+
+  //if running is high, sort them by execution time and run SJF
+  if(running->remaining_ticks > t_state[i].remaining_ticks){
       disable_interrupt();
       sorted_enqueue(ready_high, &t_state[i], t_state[i].remaining_ticks);
       sorted_enqueue(ready_high, running, running->remaining_ticks);
@@ -186,6 +183,10 @@ int mythread_create (void (*fun_addr)(),int priority,int seconds)
       return i;
     }
   }
+  //If running is not preempted, enqueue in ready_high
+  disable_interrupt();
+  sorted_enqueue(ready_high, &t_state[i], t_state[i].remaining_ticks);
+  enable_interrupt();
   return i;
 }
 /****** End my_thread_create() ******/
@@ -215,7 +216,7 @@ void mythread_exit() {
   activator(next);
 }
 
-//timer interrupt ->
+/* Free running thread due to exceeded time*/
 void mythread_timeout(int tid) {
     //int tid = running->tid;
     printf("*** THREAD %d EJECTED\n", tid);
@@ -251,44 +252,48 @@ int mythread_gettid(){
   return current;
 }
 
-
-/* SJF para alta prioridad, RR para baja*/
+/* SJF for high priority, RR for low*/
 TCB* scheduler()
 {
   TCB *next;
+  //If the high priority queue is not empty
   if(queue_empty(ready_high)==0){
-    //return dequeue(ready_high);
     disable_interrupt();
     next = dequeue(ready_high);
     enable_interrupt();
     return next;
-  }else if(queue_empty(ready_low)==0){
-    //return dequeue(ready_low);
+  }
+
+  //If low priority queue is not empty
+  if(queue_empty(ready_low)==0){
     disable_interrupt();
     next = dequeue(ready_low);
     enable_interrupt();
     return next;
-  }else{
-    //printf("mythread_free: No thread in the system\nExiting...\n");
-    printf("*** FINISHED\n");
-    exit(1);
   }
+  //printf("mythread_free: No thread in the system\nExiting...\n");
+  printf("*** FINISHED\n");
+  exit(1);
+
 }
 
 /*TCB* running*/
 /* Timer interrupt */
 void timer_interrupt(int sig)
 {
+  //Updating remaining_ticks. If exceed execution time, preempt it
   running->remaining_ticks = running->remaining_ticks -1;
-  if(running->remaining_ticks<0){ //FALTA EN RR
+  if(running->remaining_ticks<0){
     mythread_timeout(running->tid);
     return;
   }
 
+  //If running is high, let it execute
   if (running->priority == HIGH_PRIORITY){
   return;
   }
 
+  //After updating running ticks, if time slice is exceeded, get next thread to be executed
   running->ticks = running->ticks -1;
   if (running->ticks == 0){
     running->ticks = QUANTUM_TICKS;
@@ -306,6 +311,7 @@ void activator(TCB* next)
 {
   TCB *prev = running;
   running = next;
+  //If current and next threads are the same, return. (No swapcontext required)
   if(running==prev){
     return;
   }
